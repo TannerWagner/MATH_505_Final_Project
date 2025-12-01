@@ -1,0 +1,561 @@
+\documentclass{beamer}
+
+\usetheme{Madrid}
+
+% ---------- Packages ----------
+\usepackage{amsmath, amssymb, amsthm, mathtools}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{hyperref}
+
+\definecolor{linkblue}{RGB}{0,0,140}
+\hypersetup{
+  colorlinks = true,
+  linkcolor  = linkblue,
+  citecolor  = linkblue,
+  urlcolor   = linkblue
+}
+
+% ---------- Macros ----------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\mathrm{Var}}
+\newcommand{\MC}{\mathrm{MC}}
+\newcommand{\QMC}{\mathrm{QMC}}
+\newcommand{\highlight}[1]{\boxed{#1}}
+\newcommand{\figpath}{../Code/} % or just {} if you prefer
+
+% ---------- Title metadata (used only in PDF info, not for slide) ----------
+\title[QMC vs MC]{Quasi-Monte Carlo vs Monte Carlo\\[0.25em]
+for High-Dimensional Integration on $[0,1]^d$}
+\author[T. Wagner]{Tanner Wagner \\[0.25em]
+MATH 505: Numerical Analysis \\[0.25em]
+University of New Mexico}
+\date{\today}
+
+% ---------- Document begins ----------
+\begin{document}
+
+% ---------- Title slide ----------
+\begin{frame}[plain]
+  \centering
+  \vspace{1.5cm}
+
+  {\Huge Quasi-Monte Carlo vs Monte Carlo\par}
+  \vspace{0.4cm}
+  {\Large for High-Dimensional Integration on $[0,1]^d$\par}
+
+  \vspace{1.5cm}
+  {\Large Tanner Wagner\par}
+  \vspace{0.25cm}
+  {\large MATH 505: Numerical Analysis\par}
+  \vspace{0.25cm}
+  {\large University of New Mexico\par}
+
+  \vfill
+  {\large \today\par}
+\end{frame}
+
+% ---------- Outline slide ----------
+\begin{frame}{Outline}
+  \tableofcontents
+\end{frame}
+
+
+
+% =====================================================
+\section{Motivation and Goal}
+
+\begin{frame}{High-dimensional integrals}
+  \begin{itemize}
+    \item Many applications involve integrals over $[0,1]^d$:
+      \begin{itemize}
+        \item expectations in probability and statistics,
+        \item option pricing in mathematical finance,
+        \item posterior averages in Bayesian inference.
+      \end{itemize}
+    \item Classical tensor-product quadrature (Gaussian, Newton--Cotes):
+      \begin{itemize}
+        \item work grows exponentially with $d$,
+        \item the \emph{curse of dimensionality}.
+      \end{itemize}
+    \item Need methods whose cost scales more gently with dimension.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Goal of the project}
+  \begin{itemize}
+    \item Compare \textbf{plain Monte Carlo (MC)} with
+      \textbf{Sobol quasi--Monte Carlo (QMC)} for integrals
+      \[
+        I(f,d) = \int_{[0,1]^d} f(x)\,dx, \quad d \in \{5,10,15,20\}.
+      \]
+    \item Test on several smooth, high-dimensional integrands with
+      known exact values.
+    \item Metrics:
+      \begin{itemize}
+        \item absolute error,
+        \item empirical convergence rate,
+        \item \textbf{time-to-accuracy}.
+      \end{itemize}
+    \item Question: \emph{When does QMC actually beat MC in practice?}
+  \end{itemize}
+\end{frame}
+
+% =====================================================
+\section{Background}
+
+\begin{frame}{Integral as an expectation}
+  \begin{itemize}
+    \item Let $X = (X_1,\dots,X_d)$ be uniform on $[0,1]^d$.
+    \item Then
+      \[
+        I(f,d) = \int_{[0,1]^d} f(x)\,dx = \E[f(X)].
+      \]
+    \item Approximate $I(f,d)$ by a sample mean:
+      \[
+        \widehat{I}_N = \frac{1}{N}\sum_{i=1}^N f(X_i),
+      \]
+      with $X_1,\dots,X_N$ i.i.d.\ $\mathrm{Unif}([0,1]^d)$.
+    \item This is the basic idea of Monte Carlo integration.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Monte Carlo: error scaling}
+  \begin{itemize}
+    \item Assume $\Var(f(X)) = \sigma^2 < \infty$.
+    \item Then
+      \[
+        \Var(\widehat{I}_N)
+        = \Var\!\left(\frac{1}{N}\sum_{i=1}^N f(X_i)\right)
+        = \frac{\sigma^2}{N}.
+      \]
+    \item Standard deviation (typical error size):
+      \[
+        \sqrt{\Var(\widehat{I}_N)} = \frac{\sigma}{\sqrt{N}}.
+      \]
+    \item \textbf{Key point:}
+      \[
+        \text{MC error} = O\bigl(N^{-1/2}\bigr),
+      \]
+      with an exponent independent of $d$ (though $\sigma$ may depend on $d$).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Quasi-Monte Carlo (QMC)}
+  \begin{itemize}
+    \item Replace random points $X_i$ by a \emph{low-discrepancy sequence}
+      $(x_i)_{i\ge 1} \subset [0,1]^d$:
+      \[
+        \widehat{I}_N^{\QMC}(f,d) = \frac{1}{N}\sum_{i=1}^N f(x_i).
+      \]
+    \item Sobol sequence: base-2 digital net designed to fill $[0,1]^d$
+          very uniformly.
+    \item For functions of bounded variation (Hardy--Krause),
+      Koksma--Hlawka inequality gives
+      \[
+        \bigl|\widehat{I}_N^{\QMC} - I(f,d)\bigr|
+        \le V_{\mathrm{HK}}(f)\,D^*(x_1,\dots,x_N),
+      \]
+      where $D^*$ is the star-discrepancy.
+    \item For Sobol and related sequences,
+      \[
+        D^*(x_1,\dots,x_N) = O\!\left(\frac{(\log N)^d}{N}\right).
+      \]
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{MC vs QMC: heuristic comparison}
+  \begin{itemize}
+    \item Ignoring $(\log N)^d$:
+      \[
+        \text{MC: } O(N^{-1/2}), \qquad
+        \text{QMC: } O(N^{-1}).
+      \]
+    \item In practice, QMC often gives
+      \[
+        \text{much smaller error than MC for the same } N
+      \]
+      when
+      \begin{itemize}
+        \item $f$ is smooth,
+        \item the \emph{effective dimension} is moderate.
+      \end{itemize}
+    \item But constants and effective dimension matter a lot in high $d$.
+    \item This is exactly what we explore numerically.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Error metrics}
+  For each method (MC or QMC) we consider:
+  \begin{itemize}
+    \item \textbf{Absolute error}
+      \[
+        E_N(f,d) = \bigl|\widehat{I}_N(f,d) - I(f,d)\bigr|.
+      \]
+    \item \textbf{Error vs sample size}:
+      \begin{itemize}
+        \item log--log plots of $E_N$ vs $N$,
+        \item estimate slopes (empirical convergence rates).
+      \end{itemize}
+    \item \textbf{Error vs wall-clock time}:
+      \begin{itemize}
+        \item time-to-accuracy plots $E_N$ vs $T_N$,
+        \item compare which method reaches a target tolerance faster.
+      \end{itemize}
+    \item For MC, we also look at variability over repeated runs.
+  \end{itemize}
+\end{frame}
+
+% =====================================================
+\section{Test Integrands and Setup}
+
+\begin{frame}{Dimensions and sample sizes}
+  \begin{itemize}
+    \item Dimensions:
+      \[
+        d \in \{5, 10, 15, 20\}.
+      \]
+    \item Sample sizes:
+      \[
+        N \in \{2^7, 2^8, \dots, 2^{15}\}
+        = \{128, 256, \dots, 32768\}.
+      \]
+    \item For each $(f,d,N)$:
+      \begin{itemize}
+        \item MC: $R = 30$ independent runs,
+        \item QMC: single Sobol net of size $N$ (via
+              \texttt{random\_base2} in SciPy).
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Separable test integrands}
+  \begin{itemize}
+    \item We choose $f : [0,1]^d \to \R$ with closed-form integrals.
+    \item First three integrands are \emph{separable}:
+      \[
+        f(x) = \prod_{j=1}^d g_j(x_j).
+      \]
+      Then
+      \[
+        I(f,d) = \prod_{j=1}^d \int_0^1 g_j(x_j)\,dx_j.
+      \]
+    \item This makes exact values cheap to compute while still giving
+          nontrivial high-dimensional behavior.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Integrand A: separable exponential}
+  \begin{itemize}
+    \item Define
+      \[
+        f_A(x) = \exp\!\Bigl(-\sum_{j=1}^d x_j\Bigr)
+               = \prod_{j=1}^d e^{-x_j}.
+      \]
+    \item Exact integral:
+      \[
+        I(f_A,d)
+        = \prod_{j=1}^d \bigl(1 - e^{-1}\bigr)
+        = \bigl(1 - e^{-1}\bigr)^d.
+      \]
+    \item Smooth, bounded, symmetric in all coordinates.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Integrand B: rational with arctan closed form}
+  \begin{itemize}
+    \item Define
+      \[
+        f_B(x) = \prod_{j=1}^d \frac{1}{1 + j x_j^2}.
+      \]
+    \item 1D factor:
+      \[
+        \int_0^1 \frac{1}{1 + j x^2}\,dx
+        = \frac{1}{\sqrt{j}} \arctan(\sqrt{j}).
+      \]
+    \item So
+      \[
+        I(f_B,d) = \prod_{j=1}^d
+        \frac{1}{\sqrt{j}} \arctan(\sqrt{j}).
+      \]
+    \item Smooth, but anisotropic: different behavior in different
+          coordinate directions.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Integrand C: Gaussian-type}
+  \begin{itemize}
+    \item Define
+      \[
+        f_C(x) = \exp\!\Bigl(-\sum_{j=1}^d x_j^2\Bigr)
+               = \prod_{j=1}^d e^{-x_j^2}.
+      \]
+    \item Use the error function:
+      \[
+        \int_0^1 e^{-x^2}\,dx
+        = \frac{\sqrt{\pi}}{2}\,\mathrm{erf}(1).
+      \]
+    \item Hence
+      \[
+        I(f_C,d)
+        = \left(\frac{\sqrt{\pi}}{2}\,\mathrm{erf}(1)\right)^d.
+      \]
+    \item Smooth, strongly related to Gaussian integrals.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Integrand D: low effective dimension}
+  \begin{itemize}
+    \item Define, for $d \ge 5$,
+      \[
+        f_D(x) = \left(\frac{1}{5}\sum_{j=1}^5 x_j\right)^2.
+      \]
+    \item Depends only on first five coordinates $\Rightarrow$
+          \emph{low effective dimension}.
+    \item Let $X_1,\dots,X_5 \sim \mathrm{Unif}(0,1)$ independent,
+          $S = X_1 + \cdots + X_5$.
+    \item Then
+      \[
+        I(f_D,d) = \E\!\left[\left(\frac{S}{5}\right)^2\right]
+        = \frac{1}{25}\bigl(\Var(S) + (\E S)^2\bigr)
+        = \frac{4}{15},
+      \]
+      independent of $d$.
+    \item Designed to be especially favorable to QMC.
+  \end{itemize}
+\end{frame}
+
+% =====================================================
+\section{Numerical Results}
+
+\begin{frame}{Error vs $N$: moderate dimension ($d=5$)}
+  \begin{itemize}
+    \item Example: $f_A$ in $d=5$.
+  \end{itemize}
+  \begin{center}
+    \includegraphics[width=0.7\textwidth]{\figpath error_vs_N_integrand_A_d5.png}
+  \end{center}
+  \begin{itemize}
+    \item QMC curve lies below MC mean error for moderate and large $N$.
+    \item On log--log scale:
+      \begin{itemize}
+        \item QMC: slope $\approx -1$,
+        \item MC: slope $\approx -1/2$ with more variability.
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Error vs $N$: high dimension ($d=20$)}
+  \begin{columns}
+    \column{0.5\textwidth}
+      \begin{center}
+        \includegraphics[width=\textwidth]{\figpath error_vs_N_integrand_A_d20.png}
+      \end{center}
+      \begin{center}
+        $f_A$ in $d=20$
+      \end{center}
+    \column{0.5\textwidth}
+      \begin{center}
+        \includegraphics[width=\textwidth]{\figpath error_vs_N_integrand_B_d20.png}
+      \end{center}
+      \begin{center}
+        $f_B$ in $d=20$
+      \end{center}
+  \end{columns}
+  \vspace{0.2cm}
+  \begin{itemize}
+    \item QMC still shows $\approx N^{-1}$-like decay but with a \emph{large constant}.
+    \item MC errors start much smaller and stay below QMC for all $N$ tested.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Error vs $N$: Gaussian-type $f_C$ in $d=20$}
+  \begin{center}
+    \includegraphics[width=0.7\textwidth]{\figpath error_vs_N_integrand_C_d20.png}
+  \end{center}
+  \begin{itemize}
+    \item For small $N$: MC error $<$ QMC error (pre-asymptotic regime).
+    \item As $N$ grows: QMC decays faster, eventually catching up and slightly
+          overtaking MC.
+    \item Clear example of asymptotic QMC advantage showing up only at larger $N$.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Error vs $N$: low effective dimension $f_D$}
+  \begin{columns}
+    \column{0.5\textwidth}
+      \begin{center}
+        \includegraphics[width=\textwidth]{\figpath error_vs_N_integrand_D_d5.png}
+      \end{center}
+      \begin{center}
+        $f_D$ in $d=5$
+      \end{center}
+    \column{0.5\textwidth}
+      \begin{center}
+        \includegraphics[width=\textwidth]{\figpath error_vs_N_integrand_D_d20.png}
+      \end{center}
+      \begin{center}
+        $f_D$ in $d=20$
+      \end{center}
+  \end{columns}
+  \vspace{0.2cm}
+  \begin{itemize}
+    \item QMC clearly dominates MC in both $d=5$ and $d=20$.
+    \item QMC error curves in $d=5$ and $d=20$ are very similar:
+          effective dimension $\approx 5$.
+    \item Textbook example of QMC’s $O(N^{-1})$-type behavior.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Error vs time: representative examples}
+  \begin{itemize}
+    \item For each configuration, we measure wall-clock time $T_N$.
+    \item Plots of $E_N$ vs $T_N$ mirror the $E_N$ vs $N$ behavior:
+      \begin{itemize}
+        \item When QMC has smaller error at fixed $N$ (e.g.\ $f_A$ in $d=5$,
+              $f_D$), it also reaches a target tolerance faster.
+        \item When MC dominates in error (e.g.\ $f_A$ and $f_B$ in $d=20$),
+              MC is also more efficient in time.
+      \end{itemize}
+    \item Cost per sample is similar for MC and QMC, so accuracy differences
+          translate directly into time-to-accuracy.
+  \end{itemize}
+\end{frame}
+
+% =====================================================
+\section{Discussion and Takeaways}
+
+\begin{frame}{Summary of findings}
+  \begin{itemize}
+    \item \textbf{Moderate dimension ($d=5$):}
+      \begin{itemize}
+        \item QMC outperforms MC on all three separable integrands $f_A,f_B,f_C$.
+        \item Empirical slopes: QMC $\approx -1$, MC $\approx -1/2$.
+      \end{itemize}
+    \item \textbf{High dimension ($d=20$):}
+      \begin{itemize}
+        \item For $f_A$ and $f_B$ (very small exact integrals),
+              MC has smaller error than QMC for all $N$.
+        \item For Gaussian-type $f_C$, MC is better for small $N$,
+              QMC catches up at larger $N$.
+      \end{itemize}
+    \item \textbf{Low effective dimension ($f_D$):}
+      \begin{itemize}
+        \item QMC clearly wins in both $d=5$ and $d=20$.
+        \item Error curves essentially independent of the nominal dimension.
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Rates, constants, and effective dimension}
+  \begin{itemize}
+    \item Asymptotic statements
+      \[
+        \text{MC } O(N^{-1/2}), \quad \text{QMC } O(N^{-1})
+      \]
+      hide important constants.
+    \item For $f_A$ and $f_B$ in $d=20$:
+      \begin{itemize}
+        \item exact integrals are extremely small,
+        \item MC errors inherit this small scale via the variance,
+        \item QMC behaves more like $C/N$ with $C \approx O(1)$.
+      \end{itemize}
+    \item Effective dimension matters:
+      \begin{itemize}
+        \item when most variation is in a few coordinates (like $f_D$),
+              QMC works extremely well,
+        \item when variation is spread across many coordinates, the benefit
+              can be muted or delayed.
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Practical guidelines}
+  \begin{itemize}
+    \item Use Sobol QMC when:
+      \begin{itemize}
+        \item the integrand is smooth,
+        \item effective dimension is moderate or low,
+        \item you can afford moderately large $N$.
+      \end{itemize}
+    \item Plain MC can be competitive or better when:
+      \begin{itemize}
+        \item dimension is very high,
+        \item exact integrals / variances are extremely small,
+        \item you are restricted to relatively small $N$.
+      \end{itemize}
+    \item Overall message:
+      \[
+        \text{“QMC is great, but problem structure really matters.”}
+      \]
+  \end{itemize}
+\end{frame}
+
+% =====================================================
+\section{Implementation Notes}
+
+\begin{frame}{Python implementation (Code/)}
+  \begin{itemize}
+    \item \texttt{integrands.py}
+      \begin{itemize}
+        \item definitions of $f_A, f_B, f_C, f_D$,
+        \item closed-form formulas for $I(f,d)$.
+      \end{itemize}
+    \item \texttt{mc\_qmc.py}
+      \begin{itemize}
+        \item plain MC estimator using NumPy random sampling,
+        \item Sobol QMC estimator using \texttt{scipy.stats.qmc.Sobol}.
+      \end{itemize}
+    \item \texttt{run\_experiments.py}
+      \begin{itemize}
+        \item loops over $f$, $d$, $N$,
+        \item performs $R=30$ MC runs and 1 QMC run,
+        \item writes results to \texttt{results\_mc\_qmc.csv}.
+      \end{itemize}
+    \item \texttt{plot\_results.py}
+      \begin{itemize}
+        \item reads \texttt{results\_mc\_qmc.csv},
+        \item generates the error-vs-$N$ and error-vs-time plots.
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
+% =====================================================
+\section*{References}
+
+\begin{frame}{References}
+  \footnotesize
+  \begin{thebibliography}{9}
+    \bibitem{niederreiter}
+      H.~Niederreiter,
+      \emph{Random Number Generation and Quasi--Monte Carlo Methods},
+      SIAM, 1992.
+
+    \bibitem{lemieux}
+      C.~Lemieux,
+      \emph{Monte Carlo and Quasi--Monte Carlo Sampling},
+      Springer, 2009.
+
+    \bibitem{quarteroni}
+      A.~Quarteroni, R.~Sacco, and F.~Saleri,
+      \emph{Numerical Mathematics},
+      2nd ed., Springer, 2007.
+
+    \bibitem{owen}
+      A.~B.~Owen,
+      \emph{Monte Carlo Theory, Methods and Examples},
+      2013. Available online.
+
+  \end{thebibliography}
+\end{frame}
+
+% =====================================================
+\begin{frame}
+  \centering
+  \vfill
+  {\LARGE Questions?}
+  \vfill
+\end{frame}
+
+\end{document}
