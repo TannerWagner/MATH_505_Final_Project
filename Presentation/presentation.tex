@@ -105,9 +105,48 @@ University of New Mexico}
 % =====================================================
 \section{Background}
 
+\begin{frame}{Random variables in this talk}
+  \begin{itemize}
+    \item Think of a \textbf{random variable} as:
+      \begin{itemize}
+        \item a rule that assigns a number to the outcome of an experiment,
+        \item e.g.\ roll a die $\to$ number $1,\dots,6$.
+      \end{itemize}
+    \item In our setting:
+      \begin{itemize}
+        \item $X = (X_1,\dots,X_d)$ is a random point in $[0,1]^d$,
+        \item you can picture it as throwing a dart uniformly at the unit cube.
+      \end{itemize}
+    \item A function value $f(X)$ is then also a random variable
+          (it depends on where the dart lands).
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{i.i.d.\ samples and a coin-flip analogy}
+  \begin{itemize}
+    \item \textbf{i.i.d.} = independent and identically distributed:
+      \begin{itemize}
+        \item each sample is drawn with the same distribution,
+        \item and no sample influences any other.
+      \end{itemize}
+    \item Coin-flip analogy:
+      \begin{itemize}
+        \item flip a fair coin $N$ times,
+        \item the fraction of heads is a sample average of i.i.d.\ Bernoulli r.v.'s.
+      \end{itemize}
+    \item We do the same thing with integrals:
+      \begin{itemize}
+        \item draw $X_1,\dots,X_N$ i.i.d.\ uniform on $[0,1]^d$,
+        \item look at the sample average of $f(X_i)$.
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+
 \begin{frame}{Integral as an expectation}
   \begin{itemize}
     \item Let $X = (X_1,\dots,X_d)$ be uniform on $[0,1]^d$.
+    \item ``Uniform'' here means every region of $[0,1]^d$ with the same volume
+          is equally likely.
     \item Then
       \[
         I(f,d) = \int_{[0,1]^d} f(x)\,dx = \E[f(X)].
@@ -117,7 +156,30 @@ University of New Mexico}
         \widehat{I}_N = \frac{1}{N}\sum_{i=1}^N f(X_i),
       \]
       with $X_1,\dots,X_N$ i.i.d.\ $\mathrm{Unif}([0,1]^d)$.
-    \item This is the basic idea of Monte Carlo integration.
+    \item This is the basic idea of Monte Carlo integration:
+          \emph{“average many samples to approximate the true average.”}
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Why Monte Carlo works (high-level picture)}
+  \begin{itemize}
+    \item \textbf{Law of Large Numbers (LLN):}
+      \begin{itemize}
+        \item sample average $\widehat{I}_N$ converges to the true mean $\E[f(X)]$
+              as $N \to \infty$,
+        \item just like the fraction of heads $\to \tfrac{1}{2}$ for a fair coin.
+      \end{itemize}
+    \item Intuition:
+      \begin{itemize}
+        \item each new sample adds a little information about the true average,
+        \item as $N$ grows, the ``random wiggles'' cancel out.
+      \end{itemize}
+    \item \textbf{Central Limit Theorem (CLT), informally:}
+      \begin{itemize}
+        \item the error $\widehat{I}_N - \E[f(X)]$ behaves like a Gaussian
+              with width $\sim 1/\sqrt{N}$,
+        \item so typical error size is about a constant times $1/\sqrt{N}$.
+      \end{itemize}
   \end{itemize}
 \end{frame}
 
@@ -164,6 +226,30 @@ University of New Mexico}
       \]
   \end{itemize}
 \end{frame}
+
+\begin{frame}{What is a Sobol sequence?}
+  \begin{itemize}
+    \item A \textbf{Sobol sequence} is a \emph{low-discrepancy sequence}
+          of points in $[0,1]^d$:
+      \begin{itemize}
+        \item deterministic (not i.i.d.\ random),
+        \item designed to be \textbf{very evenly spread out} over the cube.
+      \end{itemize}
+    \item Built in base 2 as a \emph{digital sequence}:
+      \begin{itemize}
+        \item in 1D, think of a base-2 van der Corput sequence
+              (points that successively fill in the gaps),
+        \item in higher $d$, Sobol chooses coordinates so that all
+              low-dimensional projections are well distributed.
+      \end{itemize}
+    \item Key property: for $N$ points,
+      \[
+        D^*(x_1,\dots,x_N) = O\!\bigl((\log N)^d / N\bigr),
+      \]
+      so the points cover $[0,1]^d$ much more uniformly than i.i.d.\ samples.
+  \end{itemize}
+\end{frame}
+
 
 \begin{frame}{MC vs QMC: heuristic comparison}
   \begin{itemize}
@@ -326,6 +412,72 @@ University of New Mexico}
   \end{itemize}
 \end{frame}
 
+
+\section{Pseudocode (High-Level Overview)}
+
+\begin{frame}{Plain Monte Carlo: high-level algorithm}
+  \begin{block}{Goal}
+    Approximate
+    \[
+      I(f,d) = \int_{[0,1]^d} f(x)\,dx
+    \]
+    using random samples.
+  \end{block}
+
+  \begin{block}{Pseudocode}
+    \begin{enumerate}
+      \item Input: integrand $f$, dimension $d$, sample size $N$.
+      \item Set \texttt{sum} $\gets 0$.
+      \item For $i = 1, \dots, N$:
+        \begin{enumerate}
+          \item draw $X_i \sim \mathrm{Unif}([0,1]^d)$\\
+                (e.g.\ each coordinate $X_i[j]$ is a uniform random number in $[0,1]$),
+          \item \texttt{sum} $\gets$ \texttt{sum} $+ f(X_i)$.
+        \end{enumerate}
+      \item Output estimate
+        \[
+          \widehat{I}_N^{\MC} = \frac{\texttt{sum}}{N}.
+        \]
+    \end{enumerate}
+  \end{block}
+
+  \small
+  Randomness enters only in the step “draw $X_i$ uniformly on $[0,1]^d$”.
+  The LLN/CLT tell us that the fluctuations
+  $\widehat{I}_N^{\MC} - \E[f(X)]$ shrink like $1/\sqrt{N}$.
+\end{frame}
+
+
+\begin{frame}{Sobol Quasi--Monte Carlo: high-level algorithm}
+  \begin{block}{Idea}
+    Use a deterministic low-discrepancy sequence instead of random points.
+  \end{block}
+
+  \begin{block}{Pseudocode}
+    \begin{enumerate}
+      \item Input: integrand $f$, dimension $d$, sample size $N$.
+      \item Construct a Sobol sequence generator in dimension $d$.
+      \item Set \texttt{sum} $\gets 0$.
+      \item For $i = 1, \dots, N$:
+        \begin{enumerate}
+          \item take the next point $x_i$ from the Sobol sequence in $[0,1]^d$,
+          \item \texttt{sum} $\gets$ \texttt{sum} $+ f(x_i)$.
+        \end{enumerate}
+      \item Output estimate
+        \[
+          \widehat{I}_N^{\QMC} = \frac{\texttt{sum}}{N}.
+        \]
+    \end{enumerate}
+  \end{block}
+
+  \small
+  Here there is no randomness: once you fix “Sobol” and the dimension $d$,
+  the sequence $(x_i)$ is deterministic. The hope is that these points
+  cover $[0,1]^d$ so evenly that the error behaves like $\text{const}/N$.
+\end{frame}
+
+
+
 % =====================================================
 \section{Numerical Results}
 
@@ -422,6 +574,32 @@ University of New Mexico}
           translate directly into time-to-accuracy.
   \end{itemize}
 \end{frame}
+
+\begin{frame}{Error vs time: illustrative examples}
+  \begin{columns}
+    \column{0.5\textwidth}
+      \begin{center}
+        \includegraphics[width=\textwidth]{\figpath error_vs_time_integrand_A_d5.png}\\[0.2em]
+        \small $f_A$ in $d=5$\\
+        \small QMC reaches target accuracy faster
+      \end{center}
+
+    \column{0.5\textwidth}
+      \begin{center}
+        \includegraphics[width=\textwidth]{\figpath error_vs_time_integrand_A_d20.png}\\[0.2em]
+        \small $f_A$ in $d=20$\\
+        \small MC more efficient over this range
+      \end{center}
+  \end{columns}
+
+  \vspace{0.3cm}
+  \small
+  Same cost per sample for MC and QMC $\Rightarrow$ the lower curve at a given
+  time is the more efficient method.
+\end{frame}
+
+
+
 
 % =====================================================
 \section{Discussion and Takeaways}
@@ -521,34 +699,32 @@ University of New Mexico}
   \end{itemize}
 \end{frame}
 
+
 % =====================================================
 \section*{References}
 
 \begin{frame}{References}
   \footnotesize
-  \begin{thebibliography}{9}
-    \bibitem{niederreiter}
-      H.~Niederreiter,
+  \begin{itemize}
+    \item H.~Niederreiter,
       \emph{Random Number Generation and Quasi--Monte Carlo Methods},
       SIAM, 1992.
 
-    \bibitem{lemieux}
-      C.~Lemieux,
+    \item C.~Lemieux,
       \emph{Monte Carlo and Quasi--Monte Carlo Sampling},
       Springer, 2009.
 
-    \bibitem{quarteroni}
-      A.~Quarteroni, R.~Sacco, and F.~Saleri,
-      \emph{Numerical Mathematics},
-      2nd ed., Springer, 2007.
+    \item A.~Quarteroni, R.~Sacco, and F.~Saleri,
+      \emph{Numerical Mathematics}, 2nd ed.,
+      Springer, 2007.
 
-    \bibitem{owen}
-      A.~B.~Owen,
+    \item A.~B.~Owen,
       \emph{Monte Carlo Theory, Methods and Examples},
-      2013. Available online.
-
-  \end{thebibliography}
+      2013. Available online at
+      \url{https://artowen.su.domains/mc/}.
+  \end{itemize}
 \end{frame}
+
 
 % =====================================================
 \begin{frame}
